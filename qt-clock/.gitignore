@@ -1,0 +1,47 @@
+# Build directories
+build/
+cmake-build-*/
+
+# Qt Creator files
+CMakeLists.txt.user*
+*.pro.user*
+*.pro.user.*
+
+# Compiled Object files
+*.o
+*.obj
+*.exe
+*.out
+*.app
+
+# Compiled Dynamic libraries
+*.dll
+*.so
+*.dylib
+
+# Compiled Static libraries
+*.lib
+*.a
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+</｜｜DSML｜｜parameter>
+<｜｜DSML｜｜parameter name="task_progress" string="true">
+- [x] 创建 CMakeLists.txt
+- [x] 创建 main.cpp（程序入口）
+- [x] 创建 clockwidget.h（时钟绘制控件头文件）
+- [x] 创建 clockwidget.cpp（时钟绘制实现）
+- [x] 创建 mainwindow.h（主窗口头文件）
+- [x] 创建 mainwindow.cpp（主窗口实现）
+- [x] 创建 .gitignore
+- [ ] 创建 README.md（复制已有的 README）
+</｜｜DSML｜｜parameter>
+</｜｜DSML｜｜write_to_file>

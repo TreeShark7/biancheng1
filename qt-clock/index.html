@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Clock - 可视化时钟</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            transition: background 0.3s;
+        }
+        body.dark {
+            background: #1e1e23;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            padding: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        /* ---- 左侧时钟区 ---- */
+        .clock-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        canvas#analogClock {
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            box-shadow: 0 0 30px rgba(0,0,0,0.15);
+            transition: box-shadow 0.3s;
+        }
+        body.dark canvas#analogClock {
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+        #digitalClock {
+            font-size: 42px;
+            font-weight: bold;
+            letter-spacing: 3px;
+            color: #333;
+            transition: color 0.3s;
+        }
+        body.dark #digitalClock {
+            color: #ddd;
+        }
+        #dateDisplay {
+            font-size: 18px;
+            color: #666;
+            transition: color 0.3s;
+        }
+        body.dark #dateDisplay {
+            color: #aaa;
+        }
+        #themeBtn {
+            padding: 10px 24px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: #fff;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        #themeBtn:hover { background: #eee; }
+        body.dark #themeBtn {
+            background: #3a3a40;
+            color: #ddd;
+            border-color: #555;
+        }
+        body.dark #themeBtn:hover { background: #4a4a50; }
+
+        /* ---- 右侧功能区 ---- */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 280px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            transition: background 0.3s, color 0.3s;
+        }
+        body.dark .card {
+            background: #2a2a30;
+            color: #ddd;
+        }
+        .card h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+        }
+        body.dark .card h3 {
+            border-color: #444;
+        }
+        .card-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .card-row input, .card-row select {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            background: #fff;
+            color: #333;
+            transition: background 0.3s, color 0.3s, border 0.3s;
+        }
+        body.dark .card-row input, body.dark .card-row select {
+            background: #1e1e23;
+            color: #ddd;
+            border-color: #555;
+        }
+        .card-row button {
+            padding: 6px 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #f0f0f0;
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+            transition: all 0.2s;
+        }
+        .card-row button:hover { background: #e0e0e0; }
+        body.dark .card-row button {
+            background: #3a3a40;
+            color: #ddd;
+            border-color: #555;
+        }
+        body.dark .card-row button:hover { background: #4a4a50; }
+        .card-row button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        #alarmStatus {
+            text-align: center;
+            font-size: 13px;
+            color: #888;
+        }
+        #stopwatchDisplay {
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            padding: 8px 0;
+        }
+        #lapList {
+            max-height: 100px;
+            overflow-y: auto;
+            font-size: 13px;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        #lapList li {
+            padding: 3px 0;
+            border-bottom: 1px dashed #eee;
+        }
+        body.dark #lapList li {
+            border-color: #444;
+        }
+        #worldClockDisplay {
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            padding: 6px 0;
+        }
+        .btn-group { display: flex; gap: 6px; }
+        .btn-group button { flex: 1; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 左侧时钟区 -->
+    <div class="clock-area">
+        <canvas id="analogClock" width="400" height="400"></canvas>
+        <div id="digitalClock">00:00:00</div>
+        <div id="dateDisplay">----年--月--日 星期-</div>
+        <button id="themeBtn">切换深色主题</button>
+    </div>
+
+    <!-- 右侧功能区 -->
+    <div class="right-panel">
+
+        <!-- 闹钟提醒 -->
+        <div class="card">
+            <h3>⏰ 闹钟提醒</h3>
+            <div class="card-row">
+                <input type="time" id="alarmTime" value="08:00" step="1">
+                <button id="setAlarmBtn">设置闹钟</button>
+            </div>
+            <div id="alarmStatus">闹钟未设置</div>
+        </div>
+
+        <!-- 秒表计时 -->
+        <div class="card">
+            <h3>⏱ 秒表计时</h3>
+            <div id="stopwatchDisplay">00:00:00.000</div>
+            <div class="card-row btn-group">
+                <button id="swStartBtn">开始</button>
+                <button id="swLapBtn" disabled>记圈</button>
+                <button id="swResetBtn" disabled>重置</button>
+            </div>
+            <ul id="lapList"></ul>
+        </div>
+
+        <!-- 世界时钟 -->
+        <div class="card">
+            <h3>🌍 世界时钟</h3>
+            <div class="card-row">
+                <select id="timezoneSelect">
+                    <option value="28800">北京 (Beijing) UTC+8</option>
+                    <option value="0">伦敦 (London) UTC+0</option>
+                    <option value="-18000">纽约 (New York) UTC-5</option>
+                    <option value="-28800">洛杉矶 (Los Angeles) UTC-8</option>
+                    <option value="32400">东京 (Tokyo) UTC+9</option>
+                    <option value="3600">巴黎 (Paris) UTC+1</option>
+                    <option value="39600">悉尼 (Sydney) UTC+11</option>
+                    <option value="14400">迪拜 (Dubai) UTC+4</option>
+                </select>
+            </div>
+            <div id="worldClockDisplay">00:00:00</div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// ============================================================
+// 1. 模拟表盘（Canvas QPainter 风格绘制）
+// ============================================================
+const canvas = document.getElementById('analogClock');
+const ctx = canvas.getContext('2d');
+const cx = 200, cy = 200, R = 180;
+
+let darkMode = false;
+
+function drawClock() {
+    const now = new Date();
+    const h = now.getHours() % 12;
+    const m = now.getMinutes();
+    const s = now.getSeconds();
+    const ms = now.getMilliseconds();
+
+    ctx.clearRect(0, 0, 400, 400);
+
+    // 背景色
+    ctx.fillStyle = darkMode ? '#2a2a30' : '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // 外圈渐变（模拟 QRadialGradient）
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+    if (darkMode) {
+        grad.addColorStop(0, '#3a3a45');
+        grad.addColorStop(0.85, '#3a3a45');
+        grad.addColorStop(0.9, '#2a2a35');
+        grad.addColorStop(1, '#1e1e28');
+    } else {
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.85, '#ffffff');
+        grad.addColorStop(0.9, '#e8e8e8');
+        grad.addColorStop(1, '#d0d0d0');
+    }
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // 内圈装饰
+    ctx.strokeStyle = darkMode ? '#555' : '#aaa';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R - 12, 0, 2 * Math.PI);
+    ctx.stroke();
+
+    // 60格刻度
+    const tickColor = darkMode ? '#ccc' : '#333';
+    for (let i = 0; i < 60; i++) {
+        const angle = (i * 6 - 90) * Math.PI / 180;
+        const isMajor = i % 5 === 0;
+        const outer = isMajor ? R - 18 : R - 20;
+        const inner = isMajor ? R - 32 : R - 28;
+        ctx.strokeStyle = tickColor;
+        ctx.lineWidth = isMajor ? 3 : 1;
+        ctx.beginPath();
+        ctx.moveTo(cx + outer * Math.cos(angle), cy + outer * Math.sin(angle));
+        ctx.lineTo(cx + inner * Math.cos(angle), cy + inner * Math.sin(angle));
+        ctx.stroke();
+    }
+
+    // 1~12 数字
+    ctx.fillStyle = darkMode ? '#ddd' : '#222';
+    ctx.font = 'bold 22px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 1; i <= 12; i++) {
+        const angle = (i * 30 - 90) * Math.PI / 180;
+        const r = R - 48;
+        ctx.fillText(i.toString(), cx + r * Math.cos(angle), cy + r * Math.sin(angle));
+    }
+
+    // ---- 指针绘制 ----
+    // 时针角度: 30° × (h) + 0.5° × m
+    const hourAngle = (30 * h + 0.5 * m - 90) * Math.PI / 180;
+    // 分针角度: 6° × m + 0.1° × s
+    const minAngle = (6 * m + 0.1 * s - 90) * Math.PI / 180;
+    // 秒针角度: 6° × s + 6° × (ms/1000)
+    const secAngle = (6 * s + 6 * (ms / 1000) - 90) * Math.PI / 180;
+
+    const hColor = darkMode ? '#ddd' : '#222';
+    const mColor = darkMode ? '#bbb' : '#444';
+    const sColor = '#e04040';
+
+    // 时针
+    ctx.strokeStyle = hColor;
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + 50 * Math.cos(hourAngle), cy + 50 * Math.sin(hourAngle));
+    ctx.stroke();
+
+    // 分针
+    ctx.strokeStyle = mColor;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + 75 * Math.cos(minAngle), cy + 75 * Math.sin(minAngle));
+    ctx.stroke();
+
+    // 秒针（带尾部）
+    ctx.strokeStyle = sColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - 18 * Math.cos(secAngle), cy - 18 * Math.sin(secAngle));
+    ctx.lineTo(cx + 82 * Math.cos(secAngle), cy + 82 * Math.sin(secAngle));
+    ctx.stroke();
+
+    // 秒针末端小圆
+    ctx.fillStyle = sColor;
+    ctx.beginPath();
+    ctx.arc(cx + 82 * Math.cos(secAngle), cy + 82 * Math.sin(secAngle), 5, 0, 2 * Math.PI);
+    ctx.fill();
+
+    // 中心圆点
+    ctx.fillStyle = darkMode ? '#ddd' : '#222';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.fillStyle = sColor;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, 2 * Math.PI);
+    ctx.fill();
+
+    requestAnimationFrame(drawClock);
+}
+drawClock();
+
+// ============================================================
+// 2. 数字时钟 + 3. 日期显示
+// ============================================================
+const weekdays = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日'];
+
+function updateDateTime() {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('digitalClock').textContent = `${hh}:${mm}:${ss}`;
+
+    const y = now.getFullYear();
+    const mo = now.getMonth() + 1;
+    const d = now.getDate();
+    const w = weekdays[now.getDay() === 0 ? 6 : now.getDay() - 1];
+    document.getElementById('dateDisplay').textContent = `${y}年${mo}月${d}日 ${w}`;
+}
+setInterval(updateDateTime, 1000);
+updateDateTime();
+
+// ============================================================
+// 4. 主题切换
+// ============================================================
+const themeBtn = document.getElementById('themeBtn');
+themeBtn.addEventListener('click', () => {
+    darkMode = !darkMode;
+    document.body.classList.toggle('dark', darkMode);
+    themeBtn.textContent = darkMode ? '切换浅色主题' : '切换深色主题';
+});
+
+// ============================================================
+// 5. 闹钟提醒
+// ============================================================
+let alarmSet = false;
+let alarmTimeStr = '';
+
+document.getElementById('setAlarmBtn').addEventListener('click', () => {
+    alarmTimeStr = document.getElementById('alarmTime').value;
+    if (alarmTimeStr) {
+        alarmSet = true;
+        document.getElementById('alarmStatus').textContent = `闹钟已设置: ${alarmTimeStr}`;
+        document.getElementById('alarmStatus').style.color = '#2e7d32';
+    }
+});
+
+function checkAlarm() {
+    if (!alarmSet) return;
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    const current = `${hh}:${mm}`;
+    if (current === alarmTimeStr && ss === '00') {
+        alert('⏰ 时间到！闹钟提醒！');
+        alarmSet = false;
+        document.getElementById('alarmStatus').textContent = '闹钟未设置';
+        document.getElementById('alarmStatus').style.color = '#888';
+    }
+}
+setInterval(checkAlarm, 1000);
+
+// ============================================================
+// 6. 秒表计时
+// ============================================================
+let swRunning = false;
+let swStartTime = 0;
+let swOffset = 0;
+let swInterval = null;
+let lapCount = 0;
+
+const swDisplay = document.getElementById('stopwatchDisplay');
+const swStartBtn = document.getElementById('swStartBtn');
+const swLapBtn = document.getElementById('swLapBtn');
+const swResetBtn = document.getElementById('swResetBtn');
+const lapList = document.getElementById('lapList');
+
+function formatTime(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const millis = ms % 1000;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+}
+
+function updateStopwatch() {
+    const elapsed = swOffset + (Date.now() - swStartTime);
+    swDisplay.textContent = formatTime(elapsed);
+}
+
+swStartBtn.addEventListener('click', () => {
+    if (!swRunning) {
+        swRunning = true;
+        swStartTime = Date.now();
+        swInterval = setInterval(updateStopwatch, 50);
+        swStartBtn.textContent = '暂停';
+        swLapBtn.disabled = false;
+        swResetBtn.disabled = false;
+    } else {
+        swRunning = false;
+        swOffset += Date.now() - swStartTime;
+        clearInterval(swInterval);
+        swStartBtn.textContent = '继续';
+        swLapBtn.disabled = true;
+    }
+});
+
+swLapBtn.addEventListener('click', () => {
+    if (swRunning) {
+        const elapsed = swOffset + (Date.now() - swStartTime);
+        lapCount++;
+        const li = document.createElement('li');
+        li.textContent = `第 ${lapCount} 圈: ${formatTime(elapsed)}`;
+        lapList.appendChild(li);
+        lapList.scrollTop = lapList.scrollHeight;
+    }
+});
+
+swResetBtn.addEventListener('click', () => {
+    swRunning = false;
+    swOffset = 0;
+    lapCount = 0;
+    clearInterval(swInterval);
+    swDisplay.textContent = '00:00:00.000';
+    swStartBtn.textContent = '开始';
+    swLapBtn.disabled = true;
+    swResetBtn.disabled = true;
+    lapList.innerHTML = '';
+});
+
+// ============================================================
+// 7. 世界时钟
+// ============================================================
+const timezoneSelect = document.getElementById('timezoneSelect');
+const worldDisplay = document.getElementById('worldClockDisplay');
+
+function updateWorldClock() {
+    const offset = parseInt(timezoneSelect.value);
+    const now = new Date();
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    const local = new Date(utc + offset * 1000);
+    const hh = String(local.getHours()).padStart(2, '0');
+    const mm = String(local.getMinutes()).padStart(2, '0');
+    const ss = String(local.getSeconds()).padStart(2, '0');
+    worldDisplay.textContent = `${hh}:${mm}:${ss}`;
+}
+setInterval(updateWorldClock, 1000);
+updateWorldClock();
+timezoneSelect.addEventListener('change', updateWorldClock);
+</script>
+
+</body>
+</html>
+</｜｜DSML｜｜parameter>
+</write_to_file>
