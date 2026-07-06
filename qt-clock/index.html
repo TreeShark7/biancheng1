@@ -14,7 +14,51 @@
             align-items: center;
             height: 100vh;
             transition: all 0.5s ease;
+            position: relative;
         }
+        /* ---- 动态浮动背景层 ---- */
+        #bgCanvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(30px);
+            opacity: 0.7;
+            z-index: 0;
+            pointer-events: none;
+            transition: transform 0.12s cubic-bezier(0.1, 0.8, 0.3, 1), background 0.6s ease;
+            will-change: transform;
+        }
+        .orb-accent { background: radial-gradient(circle, var(--accent), transparent); }
+        .orb-pink { background: radial-gradient(circle, #e040a0, transparent); }
+        .orb-blue { background: radial-gradient(circle, #40c0e0, transparent); }
+        .orb-gold { background: radial-gradient(circle, #f0c040, transparent); }
+        .orb-green { background: radial-gradient(circle, #80e080, transparent); }
+        body.theme-cyberpunk .orb-pink { background: radial-gradient(circle, #ff00ff, transparent); }
+        body.theme-cyberpunk .orb-blue { background: radial-gradient(circle, #00ffff, transparent); }
+        body.theme-cyberpunk .orb-gold { background: radial-gradient(circle, #ff0066, transparent); }
+        body.theme-cyberpunk .orb-green { background: radial-gradient(circle, #00ff88, transparent); }
+        body.theme-luxury .orb-pink { background: radial-gradient(circle, #c0a060, transparent); }
+        body.theme-luxury .orb-blue { background: radial-gradient(circle, #8b6914, transparent); }
+        body.theme-luxury .orb-gold { background: radial-gradient(circle, #ffd700, transparent); }
+        body.theme-luxury .orb-green { background: radial-gradient(circle, #a08030, transparent); }
+        body.theme-macaron .orb-pink { background: radial-gradient(circle, #ff6b9d, transparent); }
+        body.theme-macaron .orb-blue { background: radial-gradient(circle, #90caf9, transparent); }
+        body.theme-macaron .orb-gold { background: radial-gradient(circle, #ce93d8, transparent); }
+        body.theme-macaron .orb-green { background: radial-gradient(circle, #88d8b0, transparent); }
+        body.theme-aurora .orb-pink { background: radial-gradient(circle, #78b8e0, transparent); }
+        body.theme-aurora .orb-blue { background: radial-gradient(circle, #60c8ff, transparent); }
+        body.theme-aurora .orb-gold { background: radial-gradient(circle, #00e5ff, transparent); }
+        body.theme-aurora .orb-green { background: radial-gradient(circle, #00ff88, transparent); }
+        body.theme-retro .orb-pink { background: radial-gradient(circle, #8b7355, transparent); }
+        body.theme-retro .orb-blue { background: radial-gradient(circle, #6b5344, transparent); }
+        body.theme-retro .orb-gold { background: radial-gradient(circle, #c4a97d, transparent); }
+        body.theme-retro .orb-green { background: radial-gradient(circle, #5a4038, transparent); }
 
         /* ===== 6 套主题 ===== */
         body.theme-classic {
@@ -427,6 +471,13 @@
     </style>
 </head>
 <body>
+
+<!-- 动态浮动背景球 -->
+<div class="bg-orb orb-accent" id="orb0" style="width:500px;height:500px;top:5%;left:3%;"></div>
+<div class="bg-orb orb-pink" id="orb1" style="width:420px;height:420px;top:55%;left:75%;"></div>
+<div class="bg-orb orb-blue" id="orb2" style="width:350px;height:350px;top:75%;left:10%;"></div>
+<div class="bg-orb orb-gold" id="orb3" style="width:300px;height:300px;top:10%;left:82%;"></div>
+<div class="bg-orb orb-green" id="orb4" style="width:380px;height:380px;top:40%;left:42%;"></div>
 
 <!-- 主题选择器 -->
 <div class="theme-selector">
@@ -842,6 +893,49 @@ function gCT(o){const d=new Date(Date.now()+new Date().getTimezoneOffset()*60000
 function rC(){cL.innerHTML='';if(!cities.length){cL.innerHTML='<div class="empty-msg">暂无城市，点击上方添加</div>';return;}const lo=-new Date().getTimezoneOffset()*60;cities.forEach((c,i)=>{const ct=gCT(c.o),df=(c.o-lo)/3600,ds=Math.abs(df)<0.01?'⏺ 同区':df>0?`+${df.toFixed(1)}h`:`${df.toFixed(1)}h`;const d=document.createElement('div');d.className=`city-item ${ct.isD?'day':'night'}`;d.innerHTML=`<span class="city-flag">${c.f}</span><div class="city-info"><div class="city-name">${c.n} <span class="city-utc">${c.u}</span> <span class="city-utc">${ds}</span></div><div class="city-detail"><span class="city-status ${ct.isD?'day':'night'}">${ct.st}</span></div></div><span class="city-time">${ct.ts}</span><button class="city-del" data-i="${i}">✕</button>`;cL.appendChild(d);});document.querySelectorAll('.city-del').forEach(b=>b.addEventListener('click',()=>{cities.splice(parseInt(b.dataset.i),1);rC();}));}
 cA.addEventListener('click',()=>{const p=cS.value.split(','),o=parseInt(p[0]),f=p[1],n=p[2];if(cities.some(c=>c.n===n)){alert(`"${n}" 已添加`);return;}const e=CDB.find(c=>c.n===n);cities.push({o,f,n,u:e?e.u:''});rC();});
 setInterval(rC,1000);
+
+// ===== 动态浮动背景：鼠标跟随视差 =====
+const orbs = [
+    document.getElementById('orb0'),
+    document.getElementById('orb1'),
+    document.getElementById('orb2'),
+    document.getElementById('orb3'),
+    document.getElementById('orb4')
+];
+
+// 每个球的原始位置（百分比）
+const orbOrigins = [
+    { x: 5, y: 10 },   // orb0
+    { x: 70, y: 60 },  // orb1
+    { x: 20, y: 80 },  // orb2
+    { x: 80, y: 20 },  // orb3
+    { x: 45, y: 45 }   // orb4
+];
+
+// 每个球的移动幅度（px），越大的球移动越多
+const orbDepths = [60, 50, 40, 35, 45];
+
+document.addEventListener('mousemove', (e) => {
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const dx = (e.clientX - cx) / cx;  // -1 ~ 1
+    const dy = (e.clientY - cy) / cy;  // -1 ~ 1
+
+    orbs.forEach((orb, i) => {
+        if (!orb) return;
+        const depth = orbDepths[i];
+        const moveX = -dx * depth;
+        const moveY = -dy * depth;
+        orb.style.transform = `translate(${moveX}px, ${moveY}px)`;
+    });
+});
+
+// 鼠标离开窗口时恢复原位
+document.addEventListener('mouseleave', () => {
+    orbs.forEach(orb => {
+        if (orb) orb.style.transform = 'translate(0, 0)';
+    });
+});
 
 // 初始化
 applyTheme('classic'); rC(); updP();
