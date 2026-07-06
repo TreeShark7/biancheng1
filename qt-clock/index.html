@@ -16,14 +16,6 @@
             transition: all 0.5s ease;
             position: relative;
         }
-        /* ---- 动态浮动背景层 ---- */
-        #bgCanvas {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 0;
-            pointer-events: none;
-        }
         .bg-orb {
             position: fixed;
             border-radius: 50%;
@@ -647,8 +639,21 @@ function applyTheme(id) {
     tT.textContent=THEMES[id].n; tB.style.display=THEMES[id].d?'inline-block':'none';
     if(!THEMES[id].d) for(const p of ['--bg','--text','--text2','--border','--btn','--btn-b','--btn-h']) document.body.style.removeProperty(p);
     if(id==='classic'){
-        if(darkOv){for(const[k,v] of Object.entries({'--bg':'rgba(35,35,45,0.9)','--text':'#ddd','--text2':'#aaa','--border':'rgba(255,255,255,0.06)','--btn':'#3a3a45','--btn-b':'#555','--btn-h':'#4a4a55'}))document.body.style.setProperty(k,v);document.body.style.background='linear-gradient(135deg,#1a1a24,#2a2a35)';tB.textContent='☀️ 浅色主题';}
-        else{for(const p of['--bg','--text','--text2','--border','--btn','--btn-b','--btn-h'])document.body.style.removeProperty(p);document.body.style.background='';tB.textContent='🌙 深色主题';}
+        if(darkOv){
+            for(const[k,v] of Object.entries({
+                '--bg':'rgba(35,35,45,0.9)','--text':'#ddd','--text2':'#aaa',
+                '--border':'rgba(255,255,255,0.06)','--btn':'#3a3a45','--btn-b':'#555','--btn-h':'#4a4a55',
+                '--cb':'rgba(20,20,30,0.9)','--cf':'#444','--cface':'rgba(30,30,40,0.9)',
+                '--tk':'#bbb','--nm':'#ddd','--hc':'#ddd','--mc':'#bbb','--sc':'#ff5050'
+            })) document.body.style.setProperty(k,v);
+            document.body.style.background='linear-gradient(135deg,#1a1a24,#2a2a35)';
+            tB.textContent='☀️ 浅色主题';
+        } else {
+            for(const p of['--bg','--text','--text2','--border','--btn','--btn-b','--btn-h','--cb','--cf','--cface','--tk','--nm','--hc','--mc','--sc'])
+                document.body.style.removeProperty(p);
+            document.body.style.background='';
+            tB.textContent='🌙 深色主题';
+        }
     }
 }
 tS.addEventListener('change',()=>applyTheme(tS.value));
