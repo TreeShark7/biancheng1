@@ -324,6 +324,42 @@
         .city-del:hover { transform: scale(1.3); }
         .city-utc { font-size: 10px; padding: 2px 6px; border-radius: 6px; background: var(--badge-bg); color: var(--badge-text); }
 
+        /* ---- 闹钟弹窗 ---- */
+        .alarm-modal {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(6px);
+        }
+        .alarm-modal.show { display: flex; }
+        .alarm-modal-box {
+            background: var(--bg);
+            border-radius: 20px;
+            padding: 36px 44px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+            animation: modalPop 0.35s ease;
+        }
+        @keyframes modalPop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .alarm-modal-icon { font-size: 56px; margin-bottom: 10px; }
+        .alarm-modal-title { font-size: 22px; font-weight: bold; color: var(--text); margin-bottom: 8px; }
+        .alarm-modal-time { font-size: 36px; font-weight: bold; color: var(--accent); letter-spacing: 3px; margin-bottom: 20px; font-family: 'Courier New', monospace; }
+        .alarm-modal-btn {
+            padding: 10px 36px; font-size: 16px; font-weight: bold;
+            border: 1px solid var(--btn-b); border-radius: 30px;
+            background: var(--accent); color: #fff; cursor: pointer;
+            transition: all 0.3s;
+        }
+        .alarm-modal-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 40%, transparent); }
+
         /* ---- 全屏专注 ---- */
         .focus-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -421,6 +457,16 @@
     <div class="focus-quote" id="focusQuote">「专注是通往卓越的唯一路径」</div>
 </div>
 
+<!-- 闹钟弹窗 -->
+<div class="alarm-modal" id="alarmModal">
+    <div class="alarm-modal-box">
+        <div class="alarm-modal-icon">⏰</div>
+        <div class="alarm-modal-title">闹钟提醒</div>
+        <div class="alarm-modal-time" id="alarmModalTime">00:00</div>
+        <button class="alarm-modal-btn" id="alarmModalBtn">🔔 知道了</button>
+    </div>
+</div>
+
 <div class="layout">
     <!-- 左侧时钟 -->
     <div class="clock-col">
@@ -477,7 +523,17 @@
             <div class="panel-body">
                 <div class="row">
                     <input type="time" id="alarmInput" value="08:00" step="1">
-                    <button id="addAlarmBtn">➕ 添加闹钟</button>
+                    <button id="addAlarmBtn">➕ 添加</button>
+                </div>
+                <div class="row" style="margin-bottom:2px;gap:4px;">
+                    <select id="alarmRingtone" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--btn);color:var(--text);outline:none;font-family:inherit;">
+                        <option value="chime">🔔 双音风铃</option>
+                        <option value="classic">📞 经典电话</option>
+                        <option value="alarm">🚨 急促警报</option>
+                        <option value="bell">🔔 学校铃声</option>
+                        <option value="music">🎵 音乐盒</option>
+                    </select>
+                    <button id="previewAlarmBtn" style="padding:5px 10px;font-size:12px;">▶ 试听</button>
                 </div>
                 <div class="scroll-list" id="alarmList"><div class="empty-msg">暂无闹钟，点击上方添加</div></div>
             </div>
@@ -577,6 +633,12 @@ draw();
 const wd=['星期一','星期二','星期三','星期四','星期五','星期六','星期日'];
 setInterval(()=>{const n=new Date(); document.getElementById('digitalClock').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`;document.getElementById('dateDisplay').textContent=`${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日 ${wd[n.getDay()===0?6:n.getDay()-1]}`;},1000);
 
+// ===== 全局：首次点击页面时初始化闹钟 AudioContext =====
+document.addEventListener('click', function initOnce() {
+    initAlarmCtx();
+    document.removeEventListener('click', initOnce);
+}, { once: true });
+
 // ===== 番茄钟 =====
 const PM={focus:{d:1500,l:'🎯 专注时间',c:'focus'},break:{d:300,l:'☕ 休息一下',c:'break'},long:{d:900,l:'🌿 长休息',c:'long'}};
 let pmM='focus',pmR=PM.focus.d,pmRun=false,pmInt=null,pmCyc=0,pmTot=0;
@@ -616,11 +678,153 @@ function crNoise(t){
 nB.forEach(b=>b.addEventListener('click',()=>{nB.forEach(x=>x.classList.remove('active'));b.classList.add('active');crNoise(b.dataset.noise);}));
 nV.addEventListener('input',()=>{nL.textContent=nV.value+'%';if(nGain)nGain.gain.value=parseInt(nV.value)/100;});
 
-// ===== 闹钟 =====
-let alarms=[]; const aI=document.getElementById('alarmInput'),aA=document.getElementById('addAlarmBtn'),aL=document.getElementById('alarmList');
+// ===== 闹钟（多铃声 + 试听） =====
+let alarms=[], alarmCtx=null, alarmKeepAlive=null;
+const aI=document.getElementById('alarmInput'),aA=document.getElementById('addAlarmBtn'),aL=document.getElementById('alarmList');
+const aR=document.getElementById('alarmRingtone'),aP=document.getElementById('previewAlarmBtn');
+
+// 确保 AudioContext 创建后持续保持激活状态（绕过浏览器自动暂停策略）
+function initAlarmCtx() {
+    if (alarmCtx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+        alarmCtx = new AC();
+        // 创建一个无声的循环缓冲区，让 AudioContext 始终保持运行
+        const sr = alarmCtx.sampleRate;
+        const buf = alarmCtx.createBuffer(1, sr, sr);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < sr; i++) data[i] = 0; // 静音
+        alarmKeepAlive = alarmCtx.createBufferSource();
+        alarmKeepAlive.buffer = buf;
+        alarmKeepAlive.loop = true;
+        alarmKeepAlive.connect(alarmCtx.destination);
+        alarmKeepAlive.start();
+    } catch(e) {}
+}
+
+// 5 种铃声生成器
+const RINGTONES = {
+    chime: function(ctx, now) {
+        // 🔔 双音风铃：A5 → C#6，重复 3 次
+        for (let r = 0; r < 3; r++) {
+            const t = now + r * 0.6;
+            [880, 1108.73].forEach((freq, idx) => {
+                const osc = ctx.createOscillator(), gain = ctx.createGain();
+                osc.type = 'sine'; osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.25, t + idx * 0.3);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + idx * 0.3 + 0.22);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(t + idx * 0.3); osc.stop(t + idx * 0.3 + 0.25);
+            });
+        }
+    },
+    classic: function(ctx, now) {
+        // 📞 经典电话：440Hz + 480Hz 双音，断续
+        for (let r = 0; r < 4; r++) {
+            const t = now + r * 0.5;
+            [440, 480].forEach(freq => {
+                const osc = ctx.createOscillator(), gain = ctx.createGain();
+                osc.type = 'square'; osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.12, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(t); osc.stop(t + 0.22);
+            });
+        }
+    },
+    alarm: function(ctx, now) {
+        // 🚨 急促警报：660Hz ↔ 880Hz 交替
+        for (let r = 0; r < 6; r++) {
+            const t = now + r * 0.3;
+            const freq = r % 2 === 0 ? 660 : 880;
+            const osc = ctx.createOscillator(), gain = ctx.createGain();
+            osc.type = 'sawtooth'; osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.15, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.22);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(t); osc.stop(t + 0.25);
+        }
+    },
+    bell: function(ctx, now) {
+        // 🔔 学校铃声：多泛音打击感
+        for (let r = 0; r < 3; r++) {
+            const t = now + r * 0.8;
+            [800, 1200, 1600, 2000].forEach((freq, idx) => {
+                const osc = ctx.createOscillator(), gain = ctx.createGain();
+                osc.type = 'sine'; osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.18 / (idx + 1), t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5 - idx * 0.1);
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.start(t); osc.stop(t + 0.6);
+            });
+        }
+    },
+    music: function(ctx, now) {
+        // 🎵 音乐盒：C-E-G-C 音阶
+        const notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach((freq, idx) => {
+            const t = now + idx * 0.25;
+            const osc = ctx.createOscillator(), gain = ctx.createGain();
+            osc.type = 'sine'; osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.22, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.35);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(t); osc.stop(t + 0.4);
+        });
+    }
+};
+
+function playRingtone(type) {
+    try {
+        if (!alarmCtx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            alarmCtx = new AC();
+        }
+        const fn = RINGTONES[type] || RINGTONES.chime;
+        fn(alarmCtx, alarmCtx.currentTime);
+    } catch(e) {}
+}
+
+// 试听时确保 AudioContext 已就绪
+aP.addEventListener('click', () => {
+    initAlarmCtx();
+    playRingtone(aR.value);
+});
+
 function rA(){aL.innerHTML='';if(!alarms.length){aL.innerHTML='<div class="empty-msg">暂无闹钟，点击上方添加</div>';return;}alarms.forEach((a,i)=>{const li=document.createElement('div');li.className='alarm-item';const [h,m]=a.time.split(':').map(Number),nm=new Date().getHours()*60+new Date().getMinutes(),am=h*60+m,soon=(am-nm+1440)%1440<30&&(am-nm+1440)%1440>0;li.innerHTML=`<span><span class="alarm-time">${a.time}</span><span class="alarm-badge">${soon?'⏳ 即将响铃':'🔔 已设置'}</span></span><button class="alarm-del" data-i="${i}">✕</button>`;aL.appendChild(li);});document.querySelectorAll('.alarm-del').forEach(b=>b.addEventListener('click',()=>{alarms.splice(parseInt(b.dataset.i),1);rA();}));}
-aA.addEventListener('click',()=>{const t=aI.value;if(!t||alarms.some(a=>a.time===t))return;alarms.push({id:Date.now(),time:t});rA();});
-setInterval(()=>{const n=new Date(),c=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`,tr=[];alarms.forEach((a,i)=>{if(a.time===c&&n.getSeconds()===0){alert(`⏰ 闹钟时间到！(${a.time})`);tr.push(i);}});if(tr.length){tr.sort((a,b)=>b-a).forEach(i=>alarms.splice(i,1));rA();}rA();},1000);
+aA.addEventListener('click',()=>{const t=aI.value;if(!t||alarms.some(a=>a.time===t))return;initAlarmCtx();alarms.push({id:Date.now(),time:t,ringtone:aR.value});rA();});
+// 闹钟弹窗元素
+const am=document.getElementById('alarmModal'),amT=document.getElementById('alarmModalTime'),amB=document.getElementById('alarmModalBtn');
+let ringingInterval=null, ringingAlarmIdx=null;
+
+function showAlarmModal(timeStr, idx) {
+    amT.textContent = timeStr;
+    am.classList.add('show');
+    ringingAlarmIdx = idx;
+    // 循环播放铃声直到用户点击关闭
+    if (ringingInterval) clearInterval(ringingInterval);
+    ringingInterval = setInterval(() => {
+        playRingtone(alarms[idx]?.ringtone || 'chime');
+    }, 1800);
+}
+
+amB.addEventListener('click', () => {
+    am.classList.remove('show');
+    if (ringingInterval) {
+        clearInterval(ringingInterval);
+        ringingInterval = null;
+    }
+    // 移除闹钟
+    if (ringingAlarmIdx !== null && alarms[ringingAlarmIdx]) {
+        alarms.splice(ringingAlarmIdx, 1);
+        rA();
+    }
+    ringingAlarmIdx = null;
+});
+
+setInterval(()=>{const n=new Date(),c=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;alarms.forEach((a,i)=>{if(a.time===c&&n.getSeconds()===0&&!am.classList.contains('show')){initAlarmCtx();playRingtone(a.ringtone||'chime');showAlarmModal(a.time,i);}});rA();},1000);
 
 // ===== 秒表 =====
 let swR=false,swSt=0,swOff=0,swInt=null,swLc=0;
